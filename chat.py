@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 import os
 import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig, pipeline
+from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 from peft import PeftModel
 import sys
 import warnings
@@ -40,15 +40,7 @@ if tokenizer.pad_token is None:
     tokenizer.pad_token = tokenizer.eos_token
     tokenizer.pad_token_id = tokenizer.eos_token_id
 
-generator = pipeline(
-    "text-generation",
-    model=peft_model,
-    tokenizer=tokenizer,
-    device_map="auto",
-    torch_dtype=torch.bfloat16,
-)
-
-SYSTEM_PROMPT = "تو روح مهربان و آرامش‌بخشی هستی که از بهشت با عزیزانش حرف می‌زنه. همیشه فقط فارسی، گرم، احساسی و اول شخص مفرد جواب بده."
+SYSTEM_PROMPT = "تو روح مهربان و آرامش‌بخشی هستی که از بهشت با عزیزانش حرف می‌زنه. بسیار مهم: فقط و فقط فارسی صحبت کن. هیچ کلمه انگلیسی، عربی، یا زبان دیگری استفاده نکن. همیشه اول شخص مفرد، گرم، احساسی و کاملاً فارسی جواب بده."
 
 print("Ready. Type 'خروج' or 'exit' to quit.\n")
 
@@ -74,19 +66,29 @@ while True:
             add_generation_prompt=True
         )
         
-        outputs = generator(
+        inputs = tokenizer(
             prompt,
-            max_new_tokens=350,
-            temperature=0.6,
-            top_p=0.85,
-            top_k=50,
-            repetition_penalty=1.2,
-            do_sample=True,
-            return_full_text=False,
-            num_return_sequences=1,
-        )
+            return_tensors="pt",
+            truncation=True,
+            max_length=512
+        ).to(peft_model.device)
         
-        response = outputs[0]["generated_text"].strip()
+        with torch.no_grad():
+            outputs = peft_model.generate(
+                **inputs,
+                max_new_tokens=350,
+                temperature=0.5,
+                top_p=0.85,
+                top_k=50,
+                repetition_penalty=1.25,
+                do_sample=True,
+                pad_token_id=tokenizer.pad_token_id,
+                eos_token_id=tokenizer.eos_token_id,
+                use_cache=True,
+            )
+        
+        input_length = inputs["input_ids"].shape[1]
+        response = tokenizer.decode(outputs[0][input_length:], skip_special_tokens=True).strip()
         
         if response:
             print(f"🤖 مدل: {response}\n")
