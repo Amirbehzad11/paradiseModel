@@ -67,7 +67,11 @@ base_model = AutoModelForCausalLM.from_pretrained(
 print("📥 بارگذاری وزن‌های LoRA...")
 print("📥 Loading LoRA weights...")
 model = PeftModel.from_pretrained(base_model, "./final_model")
-model = model.merge_and_unload()  # ادغام LoRA با مدل پایه برای سرعت بیشتر
+# برای 4-bit quantization، merge ممکن است مشکلاتی ایجاد کند
+# For 4-bit quantization, merge may cause issues
+# استفاده مستقیم از LoRA بدون merge (بهتر برای 4-bit)
+# Use LoRA directly without merge (better for 4-bit)
+print("✅ LoRA weights loaded (using without merge for better compatibility)")
 
 # بارگذاری توکنایزر
 # Load tokenizer
@@ -101,8 +105,8 @@ while True:
         if not user_input:
             continue
         
-        # فرمت کردن prompt (فرمت استاندارد instruction)
-        # Format prompt (standard instruction format)
+        # فرمت کردن prompt (فرمت استاندارد instruction - همان فرمت آموزش)
+        # Format prompt (standard instruction format - same as training)
         prompt = f"### Instruction:\n{user_input}\n\n### Response:\n"
         
         # توکنایز کردن
@@ -118,18 +122,30 @@ while True:
         # Generate response
         print("🤖 مدل: ", end="", flush=True)
         with torch.no_grad():
-            outputs = model.generate(
-                **inputs,
-                max_new_tokens=256,
-                temperature=0.7,
-                top_p=0.9,
-                do_sample=True,
-                pad_token_id=tokenizer.pad_token_id,
-                eos_token_id=tokenizer.eos_token_id,
-            )
+            try:
+                outputs = model.generate(
+                    **inputs,
+                    max_new_tokens=128,  # کاهش برای پاسخ‌های کوتاه‌تر
+                    temperature=0.3,  # کاهش برای پاسخ‌های دقیق‌تر
+                    top_p=0.85,
+                    do_sample=True,
+                    pad_token_id=tokenizer.pad_token_id,
+                    eos_token_id=tokenizer.eos_token_id,
+                    repetition_penalty=1.2,  # افزایش برای جلوگیری از تکرار
+                    no_repeat_ngram_size=3,  # جلوگیری از تکرار n-gram
+                )
+            except Exception as e:
+                print(f"\n❌ خطا در تولید: {e}")
+                print("❌ Error in generation: {e}")
+                continue
         
         # دیکد کردن پاسخ
         # Decode response
+        if len(outputs) == 0 or len(outputs[0]) == 0:
+            print("(پاسخ خالی)")
+            print("(Empty response)")
+            continue
+            
         response = tokenizer.decode(outputs[0], skip_special_tokens=True)
         
         # استخراج فقط بخش پاسخ
@@ -137,11 +153,16 @@ while True:
         if "### Response:" in response:
             response = response.split("### Response:")[-1].strip()
         else:
-            # اگر فرمت نبود، کل پاسخ را بگیر
-            # If format not found, take full response
-            response = response[len(prompt):].strip()
+            # اگر فرمت نبود، فقط بخش جدید را بگیر (بعد از prompt)
+            # If format not found, take only new part (after prompt)
+            input_length = inputs["input_ids"].shape[1]
+            response = tokenizer.decode(outputs[0][input_length:], skip_special_tokens=True).strip()
         
-        print(response)
+        if not response:
+            print("(پاسخ خالی)")
+            print("(Empty response)")
+        else:
+            print(response)
         
     except KeyboardInterrupt:
         print("\n\n👋 خداحافظ!")
