@@ -86,12 +86,10 @@ def format_prompt(example):
     # Standard instruction following format (works with Phi-3, Qwen, and most models)
     if input_text:
         prompt = f"### Instruction:\n{instruction}\n\n### Input:\n{input_text}\n\n### Response:\n{output}"
-        prompt_only = f"### Instruction:\n{instruction}\n\n### Input:\n{input_text}\n\n### Response:\n"
     else:
         prompt = f"### Instruction:\n{instruction}\n\n### Response:\n{output}"
-        prompt_only = f"### Instruction:\n{instruction}\n\n### Response:\n"
     
-    return {"text": prompt, "prompt_only": prompt_only, "output": output}
+    return {"text": prompt}
 
 formatted_data = [format_prompt(ex) for ex in dataset]
 dataset = Dataset.from_list(formatted_data)
@@ -214,7 +212,7 @@ model.print_trainable_parameters()
 def tokenize_function(examples):
     # توکنایز کردن کل متن (prompt + response)
     # Tokenize full text (prompt + response)
-    full_text = tokenizer(
+    tokenized = tokenizer(
         examples["text"],
         truncation=True,
         max_length=512,
@@ -222,29 +220,54 @@ def tokenize_function(examples):
         return_tensors=None,
     )
     
-    # توکنایز کردن فقط prompt
-    # Tokenize only prompt
-    prompt_only = tokenizer(
-        examples["prompt_only"],
-        truncation=True,
-        max_length=512,
-        padding="max_length",
-        return_tensors=None,
-    )
+    # پیدا کردن طول prompt برای هر نمونه
+    # Find prompt length for each example
+    texts = examples["text"]
+    if isinstance(texts, str):
+        texts = [texts]
     
-    # ایجاد labels: فقط بخش response باید loss داشته باشد
-    # Create labels: only response part should have loss
-    labels = full_text["input_ids"].copy()
-    prompt_length = len([t for t in prompt_only["input_ids"] if t != tokenizer.pad_token_id])
+    labels_list = []
+    input_ids = tokenized["input_ids"]
+    if not isinstance(input_ids[0], list):
+        input_ids = [input_ids]
     
-    # قسمت prompt را در labels به -100 تبدیل می‌کنیم (ignore index)
-    # Convert prompt part in labels to -100 (ignore index)
-    for i in range(min(prompt_length, len(labels))):
-        labels[i] = -100
+    for i, text in enumerate(texts):
+        # پیدا کردن موقعیت "### Response:" در متن
+        # Find position of "### Response:" in text
+        response_marker = "### Response:\n"
+        response_pos = text.find(response_marker)
+        
+        if response_pos != -1:
+            # توکنایز کردن فقط prompt (قبل از Response)
+            # Tokenize only prompt (before Response)
+            prompt_text = text[:response_pos + len(response_marker)]
+            prompt_tokenized = tokenizer(
+                prompt_text,
+                truncation=True,
+                max_length=512,
+                padding=False,
+                return_tensors=None,
+            )
+            prompt_length = len(prompt_tokenized["input_ids"])
+        else:
+            # اگر Response پیدا نشد، نصف متن را prompt در نظر بگیر
+            # If Response not found, consider half text as prompt
+            prompt_length = len(input_ids[i]) // 2
+        
+        # ایجاد labels: فقط بخش response باید loss داشته باشد
+        # Create labels: only response part should have loss
+        labels = list(input_ids[i].copy())
+        
+        # قسمت prompt را در labels به -100 تبدیل می‌کنیم (ignore index)
+        # Convert prompt part in labels to -100 (ignore index)
+        for j in range(min(prompt_length, len(labels))):
+            labels[j] = -100
+        
+        labels_list.append(labels)
     
-    full_text["labels"] = labels
+    tokenized["labels"] = labels_list
     
-    return full_text
+    return tokenized
 
 # توکنایز کردن دیتاست
 # Tokenize dataset
