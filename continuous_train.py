@@ -206,6 +206,19 @@ def train_model(dataset):
         )
         model = PeftModel.from_pretrained(base_model, FINAL_MODEL_DIR)
         model = prepare_model_for_kbit_training(model)
+        
+        # بررسی و فعال کردن trainable parameters
+        trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+        if trainable_params == 0:
+            print("⚠️ Warning: No trainable parameters! Enabling training for LoRA layers...")
+            # فعال کردن training برای همه LoRA parameters
+            for name, param in model.named_parameters():
+                if 'lora' in name.lower() or 'adapter' in name.lower():
+                    param.requires_grad = True
+            trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+            print(f"✅ Enabled {trainable_params:,} trainable parameters")
+        
+        model.train()
     else:
         print("📥 Loading base model...")
         model = AutoModelForCausalLM.from_pretrained(
@@ -228,7 +241,13 @@ def train_model(dataset):
         )
         model = get_peft_model(model, lora_config)
     
-    model.print_trainable_parameters()
+    # بررسی نهایی trainable parameters
+    trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    total_params = sum(p.numel() for p in model.parameters())
+    print(f"Final check - Trainable params: {trainable_params:,} || Total params: {total_params:,} || Trainable%: {100 * trainable_params / total_params:.4f}")
+    
+    if trainable_params == 0:
+        raise ValueError("No trainable parameters found! Cannot train model.")
     
     # Tokenize
     def tokenize_function(examples):
@@ -283,13 +302,15 @@ def train_model(dataset):
         save_steps=200,
         save_total_limit=2,
         learning_rate=2e-4,
-        fp16=True,
+        fp16=False,  # غیرفعال کردن fp16 برای جلوگیری از مشکل optimizer
+        bf16=False,
         optim="paged_adamw_8bit",
         report_to="none",
         load_best_model_at_end=True,
         metric_for_best_model="loss",
         greater_is_better=False,
         remove_unused_columns=False,
+        dataloader_pin_memory=False,
     )
     
     trainer = Trainer(
