@@ -22,6 +22,7 @@ BASE_MODEL = "HooshvareLab/gpt2-fa"
 DATASET_FILE = "dataset.json"
 BACKUP_DATASET = "dataset_backup.json"
 FINAL_MODEL_DIR = "./final_model"
+NEW_CHATS_FILE = "new_chats.json"
 
 print("Starting incremental training...")
 
@@ -38,78 +39,37 @@ else:
     print("❌ Dataset not found!")
     sys.exit(1)
 
-# اگر مدل از قبل وجود دارد، پاسخ‌های جدید تولید کن
-if os.path.exists(FINAL_MODEL_DIR) and os.path.exists(f"{FINAL_MODEL_DIR}/config.json"):
-    print("Model exists. Generating new examples...")
+# بارگذاری چت‌های جدید از chat_with_learning
+if os.path.exists(NEW_CHATS_FILE):
+    with open(NEW_CHATS_FILE, "r", encoding="utf-8") as f:
+        new_chats = json.load(f)
     
-    bnb_config = BitsAndBytesConfig(
-        load_in_4bit=True,
-        bnb_4bit_quant_type="nf4",
-        bnb_4bit_compute_dtype=torch.float16,
-        bnb_4bit_use_double_quant=True,
-    )
-    
-    base_model = AutoModelForCausalLM.from_pretrained(
-        BASE_MODEL,
-        quantization_config=bnb_config,
-        trust_remote_code=True,
-        torch_dtype=torch.float16,
-        device_map=None,
-    )
-    
-    from peft import PeftModel
-    model = PeftModel.from_pretrained(base_model, FINAL_MODEL_DIR)
-    tokenizer = AutoTokenizer.from_pretrained(FINAL_MODEL_DIR, trust_remote_code=True)
-    
-    if tokenizer.pad_token is None:
-        tokenizer.pad_token = tokenizer.eos_token
-    
-    # تولید نمونه‌های جدید از مدل
-    new_examples = []
-    relationships = ["پدر", "مادر", "برادر", "خواهر", "همسر", "فرزند", "پدربزرگ", "مادربزرگ"]
-    years = ["۹۵", "۹۶", "۹۷", "۹۸", "۹۹", "۱۴۰۰", "۱۴۰۱", "۱۴۰۲"]
-    
-    print("Generating new examples from model...")
-    for rel in relationships:
-        for year in years[:3]:  # فقط 3 سال برای هر رابطه
-            inst = f"{rel}م سال {year} فوت کرد. می‌خوام باهاش صحبت کنم"
-            prompt = f"User: {inst}\nAssistant:"
-            inputs = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=256)
-            
-            # پیدا کردن device
-            device = next(model.parameters()).device
-            inputs = inputs.to(device)
-            
-            with torch.no_grad():
-                outputs = model.generate(
-                    **inputs,
-                    max_new_tokens=200,
-                    temperature=0.7,
-                    top_p=0.9,
-                    repetition_penalty=1.2,
-                    do_sample=True,
-                    pad_token_id=tokenizer.pad_token_id,
-                    eos_token_id=tokenizer.eos_token_id,
-                )
-            
-            input_length = inputs["input_ids"].shape[1]
-            response = tokenizer.decode(outputs[0][input_length:], skip_special_tokens=True).strip()
-            
-            if response and len(response) > 20 and len(response) < 500:  # فقط پاسخ‌های معنی‌دار
-                new_examples.append({
-                    "instruction": inst,
-                    "response": response
+    if new_chats:
+        print(f"Found {len(new_chats)} new chats from conversations")
+        # تبدیل به فرمت dataset
+        for chat in new_chats:
+            if "instruction" in chat and "response" in chat:
+                current_dataset.append({
+                    "instruction": chat["instruction"],
+                    "response": chat["response"]
                 })
-    
-    if new_examples:
-        print(f"Generated {len(new_examples)} new examples")
-        current_dataset.extend(new_examples)
+        print(f"Added {len(new_chats)} new examples from chats")
+        print(f"Total dataset now: {len(current_dataset)} examples")
         
+        # ذخیره dataset به‌روز شده
         with open(DATASET_FILE, "w", encoding="utf-8") as f:
-            json.dump(current_dataset, f, ensure_ascii=False, indent=4)
-        print(f"Updated dataset: {len(current_dataset)} examples")
+            json.dump(current_dataset, f, ensure_ascii=False, indent=2)
+        
+        # پاک کردن چت‌های استفاده شده
+        with open(NEW_CHATS_FILE, "w", encoding="utf-8") as f:
+            json.dump([], f)
     else:
-        print("No new examples generated")
+        print("No new chats found")
+else:
+    print("No new chats file found")
+
+# اگر چت‌های جدید اضافه شدند، نیازی به تولید نمونه‌های جدید نیست
+# چت‌های واقعی کاربر بهتر از نمونه‌های تولید شده هستند
 
 print(f"Final dataset size: {len(current_dataset)} examples")
 
@@ -176,8 +136,32 @@ def tokenize_function(examples):
         truncation=True,
         max_length=512,
         padding="max_length",
+        return_tensors=None,
     )
-    tokenized["labels"] = tokenized["input_ids"].copy()
+    
+    labels = []
+    for i, text in enumerate(examples["text"]):
+        assistant_prefix = "Assistant:"
+        assistant_start_idx = text.find(assistant_prefix)
+        
+        if assistant_start_idx != -1:
+            prompt_tokens = tokenizer(
+                text[:assistant_start_idx + len(assistant_prefix)],
+                truncation=True,
+                max_length=512,
+                padding=False,
+                return_tensors=None,
+            )["input_ids"]
+            prompt_length = len(prompt_tokens)
+        else:
+            prompt_length = len(tokenized["input_ids"][i]) // 2
+        
+        current_labels = list(tokenized["input_ids"][i])
+        for j in range(min(prompt_length, len(current_labels))):
+            current_labels[j] = -100
+        labels.append(current_labels)
+    
+    tokenized["labels"] = labels
     return tokenized
 
 print("Tokenizing dataset...")
