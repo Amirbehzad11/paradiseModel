@@ -13,6 +13,7 @@ from transformers import (
     BitsAndBytesConfig
 )
 from peft import PeftModel
+from huggingface_hub import HfFolder
 import sys
 
 # بررسی وجود مدل
@@ -36,10 +37,19 @@ bnb_config = BitsAndBytesConfig(
     bnb_4bit_use_double_quant=True,
 )
 
-# بارگذاری مدل پایه
-# Load base model
-BASE_MODEL = "meta-llama/Llama-3.2-1B-Instruct"  # باید با train_once.py یکسان باشد
-hf_token = os.getenv("HF_TOKEN") or os.getenv("HUGGINGFACE_TOKEN")
+# بارگذاری مدل پایه - باید با train_once.py یکسان باشد
+# Load base model - must match train_once.py
+BASE_MODEL = "microsoft/Phi-3-mini-4k-instruct"  # کاملاً باز، بدون مجوز
+# BASE_MODEL = "Qwen/Qwen2-1.5B-Instruct"  # جایگزین: پشتیبانی عالی از فارسی
+
+# برای مدل‌های باز، توکن اختیاری است
+# For open models, token is optional
+from huggingface_hub import HfFolder
+hf_token = (
+    os.getenv("HF_TOKEN") or 
+    os.getenv("HUGGINGFACE_TOKEN") or
+    HfFolder.get_token()
+)
 
 print("📥 بارگذاری مدل پایه...")
 print("📥 Loading base model...")
@@ -91,8 +101,8 @@ while True:
         if not user_input:
             continue
         
-        # فرمت کردن prompt
-        # Format prompt
+        # فرمت کردن prompt (فرمت استاندارد instruction)
+        # Format prompt (standard instruction format)
         prompt = f"### Instruction:\n{user_input}\n\n### Response:\n"
         
         # توکنایز کردن

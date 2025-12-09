@@ -17,6 +17,7 @@ from transformers import (
 )
 from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
 from datasets import Dataset
+from huggingface_hub import HfFolder
 import sys
 
 # بررسی وجود مدل آموزش‌دیده
@@ -30,16 +31,39 @@ if os.path.exists("./final_model") and os.path.isdir("./final_model"):
 print("🚀 شروع آموزش مدل...")
 print("🚀 Starting model training...")
 
-# تنظیمات مدل پایه
-# Base model settings
-BASE_MODEL = "meta-llama/Llama-3.2-1B-Instruct"  # یا Llama-3.2-3B-Instruct
+# تنظیمات مدل پایه - مدل کاملاً باز بدون نیاز به مجوز
+# Base model settings - Fully open model, no license required
 
-# بررسی دسترسی به Hugging Face
-# Check Hugging Face access
-hf_token = os.getenv("HF_TOKEN") or os.getenv("HUGGINGFACE_TOKEN")
-if not hf_token:
-    print("⚠️  Warning: HF_TOKEN not set. Trying without token...")
-    print("⚠️  هشدار: HF_TOKEN تنظیم نشده است. تلاش بدون توکن...")
+# گزینه 1: Phi-3-mini (پیشنهادی - بهترین برای instruction following)
+BASE_MODEL = "microsoft/Phi-3-mini-4k-instruct"  # کاملاً باز، بدون مجوز، عالی برای instruction
+
+# گزینه 2: Qwen (عالی برای فارسی/انگلیسی)
+# BASE_MODEL = "Qwen/Qwen2-1.5B-Instruct"
+
+# گزینه 3: DialoGPT (برای dialogue - نیاز به فرمت خاص)
+# BASE_MODEL = "microsoft/DialoGPT-medium"
+
+# گزینه 4: GPT2 (برای text generation - نیاز به فرمت خاص)
+# BASE_MODEL = "gpt2-medium"
+
+# بررسی دسترسی به Hugging Face (اختیاری برای مدل‌های باز)
+# Check Hugging Face access (optional for open models)
+from huggingface_hub import HfFolder
+
+hf_token = (
+    os.getenv("HF_TOKEN") or 
+    os.getenv("HUGGINGFACE_TOKEN") or
+    HfFolder.get_token()  # خواندن از کش Hugging Face
+)
+
+# برای مدل‌های باز، توکن اختیاری است
+# For open models, token is optional
+if hf_token:
+    print("✅ توکن Hugging Face یافت شد (اختیاری)")
+    print("✅ Hugging Face token found (optional)")
+else:
+    print("ℹ️  بدون توکن ادامه می‌دهیم (مدل باز است)")
+    print("ℹ️  Continuing without token (model is open)")
 
 # بارگذاری دیتاست
 # Load dataset
@@ -51,13 +75,15 @@ with open("dataset.json", "r", encoding="utf-8") as f:
 print(f"✅ {len(dataset)} نمونه بارگذاری شد")
 print(f"✅ {len(dataset)} examples loaded")
 
-# تبدیل به فرمت مناسب
-# Convert to proper format
+# تبدیل به فرمت مناسب (سازگار با Phi-3 و Qwen)
+# Convert to proper format (compatible with Phi-3 and Qwen)
 def format_prompt(example):
     instruction = example.get("instruction", "")
     input_text = example.get("input", "")
     output = example.get("output", "")
     
+    # فرمت استاندارد instruction following (کار می‌کند با Phi-3, Qwen, و بیشتر مدل‌ها)
+    # Standard instruction following format (works with Phi-3, Qwen, and most models)
     if input_text:
         prompt = f"### Instruction:\n{instruction}\n\n### Input:\n{input_text}\n\n### Response:\n{output}"
     else:
@@ -81,11 +107,34 @@ print(f"✅ Dataset split: {len(train_dataset)} train, {len(eval_dataset)} eval"
 # Load tokenizer
 print("🔤 بارگذاری توکنایزر...")
 print("🔤 Loading tokenizer...")
-tokenizer = AutoTokenizer.from_pretrained(
-    BASE_MODEL,
-    token=hf_token,
-    trust_remote_code=True
-)
+try:
+    tokenizer = AutoTokenizer.from_pretrained(
+        BASE_MODEL,
+        token=hf_token,
+        trust_remote_code=True
+    )
+except Exception as e:
+    if "gated" in str(e).lower() or "403" in str(e) or "access" in str(e).lower():
+        print("❌ خطا: دسترسی به مدل محدود است!")
+        print("❌ Error: Model access is restricted!")
+        print("")
+        print("📝 لطفا این مراحل را انجام دهید:")
+        print("📝 Please follow these steps:")
+        print("")
+        print("1. به این آدرس بروید و مجوز را بپذیرید:")
+        print("   Visit and accept the license:")
+        print(f"   https://huggingface.co/{BASE_MODEL}")
+        print("")
+        print("2. مطمئن شوید که با حساب درست لاگین کرده‌اید:")
+        print("   Make sure you're logged in with the correct account:")
+        print("   huggingface-cli login")
+        print("")
+        print("3. چند دقیقه صبر کنید تا دسترسی فعال شود")
+        print("   Wait a few minutes for access to be activated")
+        print("")
+        sys.exit(1)
+    else:
+        raise
 
 if tokenizer.pad_token is None:
     tokenizer.pad_token = tokenizer.eos_token
@@ -106,14 +155,37 @@ bnb_config = BitsAndBytesConfig(
 # Load model
 print("🤖 بارگذاری مدل پایه...")
 print("🤖 Loading base model...")
-model = AutoModelForCausalLM.from_pretrained(
-    BASE_MODEL,
-    quantization_config=bnb_config,
-    device_map="auto",
-    token=hf_token,
-    trust_remote_code=True,
-    torch_dtype=torch.float16,
-)
+try:
+    model = AutoModelForCausalLM.from_pretrained(
+        BASE_MODEL,
+        quantization_config=bnb_config,
+        device_map="auto",
+        token=hf_token,
+        trust_remote_code=True,
+        torch_dtype=torch.float16,
+    )
+except Exception as e:
+    if "gated" in str(e).lower() or "403" in str(e) or "access" in str(e).lower():
+        print("❌ خطا: دسترسی به مدل محدود است!")
+        print("❌ Error: Model access is restricted!")
+        print("")
+        print("📝 لطفا این مراحل را انجام دهید:")
+        print("📝 Please follow these steps:")
+        print("")
+        print("1. به این آدرس بروید و مجوز را بپذیرید:")
+        print("   Visit and accept the license:")
+        print(f"   https://huggingface.co/{BASE_MODEL}")
+        print("")
+        print("2. مطمئن شوید که با حساب درست لاگین کرده‌اید:")
+        print("   Make sure you're logged in with the correct account:")
+        print("   huggingface-cli login")
+        print("")
+        print("3. چند دقیقه صبر کنید تا دسترسی فعال شود")
+        print("   Wait a few minutes for access to be activated")
+        print("")
+        sys.exit(1)
+    else:
+        raise
 
 # آماده‌سازی مدل برای آموزش
 # Prepare model for training
