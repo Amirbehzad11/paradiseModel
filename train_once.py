@@ -86,10 +86,12 @@ def format_prompt(example):
     # Standard instruction following format (works with Phi-3, Qwen, and most models)
     if input_text:
         prompt = f"### Instruction:\n{instruction}\n\n### Input:\n{input_text}\n\n### Response:\n{output}"
+        prompt_only = f"### Instruction:\n{instruction}\n\n### Input:\n{input_text}\n\n### Response:\n"
     else:
         prompt = f"### Instruction:\n{instruction}\n\n### Response:\n{output}"
+        prompt_only = f"### Instruction:\n{instruction}\n\n### Response:\n"
     
-    return {"text": prompt}
+    return {"text": prompt, "prompt_only": prompt_only, "output": output}
 
 formatted_data = [format_prompt(ex) for ex in dataset]
 dataset = Dataset.from_list(formatted_data)
@@ -207,15 +209,42 @@ lora_config = LoraConfig(
 model = get_peft_model(model, lora_config)
 model.print_trainable_parameters()
 
-# تابع توکنایز کردن
-# Tokenization function
+# تابع توکنایز کردن با labels
+# Tokenization function with labels
 def tokenize_function(examples):
-    return tokenizer(
+    # توکنایز کردن کل متن (prompt + response)
+    # Tokenize full text (prompt + response)
+    full_text = tokenizer(
         examples["text"],
         truncation=True,
         max_length=512,
         padding="max_length",
+        return_tensors=None,
     )
+    
+    # توکنایز کردن فقط prompt
+    # Tokenize only prompt
+    prompt_only = tokenizer(
+        examples["prompt_only"],
+        truncation=True,
+        max_length=512,
+        padding="max_length",
+        return_tensors=None,
+    )
+    
+    # ایجاد labels: فقط بخش response باید loss داشته باشد
+    # Create labels: only response part should have loss
+    labels = full_text["input_ids"].copy()
+    prompt_length = len([t for t in prompt_only["input_ids"] if t != tokenizer.pad_token_id])
+    
+    # قسمت prompt را در labels به -100 تبدیل می‌کنیم (ignore index)
+    # Convert prompt part in labels to -100 (ignore index)
+    for i in range(min(prompt_length, len(labels))):
+        labels[i] = -100
+    
+    full_text["labels"] = labels
+    
+    return full_text
 
 # توکنایز کردن دیتاست
 # Tokenize dataset
@@ -245,6 +274,8 @@ training_args = TrainingArguments(
     load_best_model_at_end=True,
     metric_for_best_model="loss",
     greater_is_better=False,
+    remove_unused_columns=False,  # برای حفظ labels
+    dataloader_pin_memory=False,  # برای جلوگیری از مشکلات حافظه
 )
 
 # Trainer
