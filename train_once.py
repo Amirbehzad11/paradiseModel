@@ -63,7 +63,6 @@ print("🤖 Loading base model...")
 model = AutoModelForCausalLM.from_pretrained(
     BASE_MODEL,
     quantization_config=bnb_config,
-    device_map="auto",
     trust_remote_code=True,
     torch_dtype=torch.float16,
 )
