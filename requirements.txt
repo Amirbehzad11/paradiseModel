@@ -1,0 +1,38 @@
+# وابستگی‌های اصلی سیستم
+# Main system dependencies
+
+# PyTorch - باید جداگانه نصب شود با CUDA
+# PyTorch - should be installed separately with CUDA
+# torch>=2.0.0
+# torchvision
+# torchaudio
+
+# Hugging Face ecosystem
+transformers>=4.40.0
+accelerate>=0.27.0
+peft>=0.8.0
+bitsandbytes>=0.43.0
+datasets>=2.18.0
+sentencepiece>=0.1.99
+protobuf>=3.20.0
+
+# Training utilities
+scipy>=1.11.0
+scikit-learn>=1.3.0
+
+# Data handling
+numpy>=1.24.0
+pandas>=2.0.0
+
+# Progress bars
+tqdm>=4.66.0
+
+# Hugging Face Hub (for model download)
+huggingface-hub>=0.20.0
+
+# Tokenization
+tokenizers>=0.15.0
+
+# Optional but recommended
+safetensors>=0.4.0
+
