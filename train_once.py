@@ -267,14 +267,27 @@ def tokenize_function(examples):
     
     tokenized["labels"] = labels_list
     
+    # حذف فیلد text (دیگر نیاز نیست)
+    # Remove text field (no longer needed)
+    if "text" in tokenized:
+        del tokenized["text"]
+    
     return tokenized
 
 # توکنایز کردن دیتاست
 # Tokenize dataset
 print("🔤 توکنایز کردن دیتاست...")
 print("🔤 Tokenizing dataset...")
-train_dataset = train_dataset.map(tokenize_function, batched=True)
-eval_dataset = eval_dataset.map(tokenize_function, batched=True)
+train_dataset = train_dataset.map(
+    tokenize_function, 
+    batched=True,
+    remove_columns=["text"]  # حذف فیلد text بعد از tokenization
+)
+eval_dataset = eval_dataset.map(
+    tokenize_function, 
+    batched=True,
+    remove_columns=["text"]  # حذف فیلد text بعد از tokenization
+)
 
 # تنظیمات آموزش
 # Training arguments
