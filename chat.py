@@ -44,13 +44,6 @@ SYSTEM_PROMPT = "تو روح مهربان و آرامش‌بخشی هستی که
 
 print("Ready. Type 'خروج' or 'exit' to quit.\n")
 
-stop_token_ids = [tokenizer.eos_token_id]
-try:
-    end_token_id = tokenizer.convert_tokens_to_ids("<|end|>")
-    if end_token_id != tokenizer.unk_token_id:
-        stop_token_ids.append(end_token_id)
-except:
-    pass
 
 while True:
     try:
@@ -83,8 +76,6 @@ while True:
         
         print("🤖 مدل: ", end="", flush=True)
         
-        print("🤖 مدل: ", end="", flush=True)
-        
         with torch.no_grad():
             outputs = peft_model.generate(
                 **inputs,
@@ -96,7 +87,6 @@ while True:
                 do_sample=True,
                 pad_token_id=tokenizer.pad_token_id,
                 eos_token_id=tokenizer.eos_token_id,
-                stop_token_ids=stop_token_ids,
                 use_cache=True,
             )
         
