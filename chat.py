@@ -81,6 +81,10 @@ while True:
             max_length=512
         ).to(peft_model.device)
         
+        print("🤖 مدل: ", end="", flush=True)
+        
+        print("🤖 مدل: ", end="", flush=True)
+        
         with torch.no_grad():
             outputs = peft_model.generate(
                 **inputs,
@@ -100,10 +104,13 @@ while True:
         response = tokenizer.decode(outputs[0][input_length:], skip_special_tokens=True).strip()
         
         if response:
-            print(f"🤖 مدل: {response}\n")
+            print(f"{response}\n")
+        else:
+            print("(پاسخ خالی)\n")
         
     except KeyboardInterrupt:
         print("\n👋 Goodbye!")
         break
-    except Exception:
+    except Exception as e:
+        print(f"\n❌ خطا: {e}\n")
         continue
