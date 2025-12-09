@@ -63,9 +63,9 @@ python continuous_train.py
 در `continuous_train.py` می‌توانید تنظیمات را تغییر دهید:
 
 ```python
-GENERATE_NEW_EXAMPLES = 100  # تعداد نمونه‌های جدید در هر چرخه
-MIN_CYCLE_INTERVAL = 300     # فاصله بین چرخه‌ها (ثانیه) = 5 دقیقه
-MAX_DATASET_SIZE = 10000     # حداکثر اندازه dataset
+GENERATE_NEW_EXAMPLES = 500  # تعداد نمونه‌های جدید در هر چرخه
+MIN_CYCLE_INTERVAL = 1     # فاصله بین چرخه‌ها (ثانیه) = 5 دقیقه
+MAX_DATASET_SIZE = 10000000     # حداکثر اندازه dataset
 ```
 
 ### توصیه‌ها:
