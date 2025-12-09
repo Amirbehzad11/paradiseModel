@@ -24,11 +24,14 @@ bnb_config = BitsAndBytesConfig(
 
 BASE_MODEL = "HooshvareLab/gpt2-fa"
 
+os.environ["HF_HUB_DOWNLOAD_TIMEOUT"] = "300"
+
 base_model = AutoModelForCausalLM.from_pretrained(
     BASE_MODEL,
     quantization_config=bnb_config,
     trust_remote_code=True,
     torch_dtype=torch.float16,
+    local_files_only=False,
 )
 
 peft_model = PeftModel.from_pretrained(base_model, "./final_model")

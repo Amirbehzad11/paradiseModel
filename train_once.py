@@ -60,6 +60,8 @@ bnb_config = BitsAndBytesConfig(
 )
 
 print("🤖 Loading base model...")
+os.environ["HF_HUB_DOWNLOAD_TIMEOUT"] = "300"
+
 model = AutoModelForCausalLM.from_pretrained(
     BASE_MODEL,
     quantization_config=bnb_config,
