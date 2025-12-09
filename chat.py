@@ -5,6 +5,8 @@ import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 from peft import PeftModel
 import sys
+import warnings
+warnings.filterwarnings("ignore")
 
 if not os.path.exists("./final_model"):
     print("❌ Model not found. Run train_once.py first.")
@@ -27,6 +29,7 @@ base_model = AutoModelForCausalLM.from_pretrained(
     device_map="auto",
     trust_remote_code=True,
     torch_dtype=torch.bfloat16,
+    attn_implementation="eager",
 )
 
 peft_model = PeftModel.from_pretrained(base_model, "./final_model")
@@ -51,7 +54,16 @@ while True:
         if not user_input:
             continue
         
-        chat_template = f"<|user|>\n{SYSTEM_PROMPT}<|end|>\n<|user|>\n{user_input}<|end|>\n<|assistant|>\n"
+        messages = [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": user_input}
+        ]
+        
+        chat_template = tokenizer.apply_chat_template(
+            messages,
+            tokenize=False,
+            add_generation_prompt=True
+        )
         
         inputs = tokenizer(
             chat_template,
@@ -70,6 +82,7 @@ while True:
                 do_sample=True,
                 pad_token_id=tokenizer.pad_token_id,
                 eos_token_id=tokenizer.eos_token_id,
+                use_cache=True,
             )
         
         input_length = inputs["input_ids"].shape[1]
@@ -81,5 +94,5 @@ while True:
     except KeyboardInterrupt:
         print("\n👋 Goodbye!")
         break
-    except Exception as e:
+    except Exception:
         continue
