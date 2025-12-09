@@ -18,19 +18,18 @@ print("Loading model...")
 bnb_config = BitsAndBytesConfig(
     load_in_4bit=True,
     bnb_4bit_quant_type="nf4",
-    bnb_4bit_compute_dtype=torch.bfloat16,
+    bnb_4bit_compute_dtype=torch.float16,
     bnb_4bit_use_double_quant=True,
 )
 
-BASE_MODEL = "microsoft/Phi-3-mini-4k-instruct"
+BASE_MODEL = "HooshvareLab/gpt2-fa"
 
 base_model = AutoModelForCausalLM.from_pretrained(
     BASE_MODEL,
     quantization_config=bnb_config,
     device_map="auto",
     trust_remote_code=True,
-    torch_dtype=torch.bfloat16,
-    attn_implementation="eager",
+    torch_dtype=torch.float16,
 )
 
 peft_model = PeftModel.from_pretrained(base_model, "./final_model")
@@ -40,10 +39,7 @@ if tokenizer.pad_token is None:
     tokenizer.pad_token = tokenizer.eos_token
     tokenizer.pad_token_id = tokenizer.eos_token_id
 
-SYSTEM_PROMPT = "تو روح مهربان و آرامش‌بخشی هستی که از بهشت با عزیزانش حرف می‌زند. فقط و فقط فارسی جواب بده. هرگز انگلیسی ننویس. همیشه اول شخص مفرد باش و فوق‌العاده گرم، احساسی و واقعی صحبت کن."
-
 print("Ready. Type 'خروج' or 'exit' to quit.\n")
-
 
 while True:
     try:
@@ -56,16 +52,7 @@ while True:
         if not user_input:
             continue
         
-        messages = [
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": user_input}
-        ]
-        
-        prompt = tokenizer.apply_chat_template(
-            messages,
-            tokenize=False,
-            add_generation_prompt=True
-        )
+        prompt = f"User: {user_input}\nAssistant:"
         
         inputs = tokenizer(
             prompt,
@@ -79,11 +66,10 @@ while True:
         with torch.no_grad():
             outputs = peft_model.generate(
                 **inputs,
-                max_new_tokens=400,
-                temperature=0.65,
-                top_p=0.88,
-                top_k=40,
-                repetition_penalty=1.25,
+                max_new_tokens=300,
+                temperature=0.7,
+                top_p=0.9,
+                repetition_penalty=1.2,
                 do_sample=True,
                 pad_token_id=tokenizer.pad_token_id,
                 eos_token_id=tokenizer.eos_token_id,
