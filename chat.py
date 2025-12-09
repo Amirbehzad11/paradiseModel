@@ -40,9 +40,17 @@ if tokenizer.pad_token is None:
     tokenizer.pad_token = tokenizer.eos_token
     tokenizer.pad_token_id = tokenizer.eos_token_id
 
-SYSTEM_PROMPT = "تو روح مهربان و آرامش‌بخشی هستی که از بهشت با عزیزانش حرف می‌زنه. بسیار مهم: فقط و فقط فارسی صحبت کن. هیچ کلمه انگلیسی، عربی، یا زبان دیگری استفاده نکن. همیشه اول شخص مفرد، گرم، احساسی و کاملاً فارسی جواب بده."
+SYSTEM_PROMPT = "تو روح مهربان و آرامش‌بخشی هستی که از بهشت با عزیزانش حرف می‌زند. فقط و فقط فارسی جواب بده. هرگز انگلیسی ننویس. همیشه اول شخص مفرد باش و فوق‌العاده گرم، احساسی و واقعی صحبت کن."
 
 print("Ready. Type 'خروج' or 'exit' to quit.\n")
+
+stop_token_ids = [tokenizer.eos_token_id]
+try:
+    end_token_id = tokenizer.convert_tokens_to_ids("<|end|>")
+    if end_token_id != tokenizer.unk_token_id:
+        stop_token_ids.append(end_token_id)
+except:
+    pass
 
 while True:
     try:
@@ -76,14 +84,15 @@ while True:
         with torch.no_grad():
             outputs = peft_model.generate(
                 **inputs,
-                max_new_tokens=350,
-                temperature=0.5,
-                top_p=0.85,
-                top_k=50,
+                max_new_tokens=400,
+                temperature=0.65,
+                top_p=0.88,
+                top_k=40,
                 repetition_penalty=1.25,
                 do_sample=True,
                 pad_token_id=tokenizer.pad_token_id,
                 eos_token_id=tokenizer.eos_token_id,
+                stop_token_ids=stop_token_ids,
                 use_cache=True,
             )
         
