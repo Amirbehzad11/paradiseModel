@@ -61,12 +61,15 @@ bnb_config = BitsAndBytesConfig(
 
 print("🤖 Loading base model...")
 os.environ["HF_HUB_DOWNLOAD_TIMEOUT"] = "300"
+os.environ["ACCELERATE_DISABLE_RICH"] = "1"
 
 model = AutoModelForCausalLM.from_pretrained(
     BASE_MODEL,
     quantization_config=bnb_config,
     trust_remote_code=True,
     torch_dtype=torch.float16,
+    low_cpu_mem_usage=True,
+    device_map=None,
 )
 
 model = prepare_model_for_kbit_training(model)
