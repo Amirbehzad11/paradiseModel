@@ -175,10 +175,20 @@ except ImportError:
     use_flash_attention = False
     print("ℹ️  Flash Attention 2 not installed, using eager attention")
 
+# تنظیم device_map برای مدیریت بهتر حافظه
+# محدود کردن استفاده از GPU به 9GB برای باقی گذاشتن حافظه برای training
+if torch.cuda.is_available():
+    print(f"💾 GPU Memory: {torch.cuda.get_device_properties(0).total_memory / 1024**3:.2f} GB")
+    max_memory = {0: "9GB", "cpu": "30GB"}
+    print("ℹ️  Using CPU offloading for overflow layers")
+else:
+    max_memory = {"cpu": "30GB"}
+
 model = AutoModelForCausalLM.from_pretrained(
     BASE_MODEL,
     quantization_config=bnb_config,
     device_map="auto",
+    max_memory=max_memory,
     trust_remote_code=True,
     dtype=torch.bfloat16,  # استفاده از dtype به جای torch_dtype (deprecated)
     attn_implementation="flash_attention_2" if use_flash_attention else "eager",
