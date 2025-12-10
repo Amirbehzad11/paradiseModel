@@ -55,7 +55,8 @@ class ChatService:
         """
         self._ensure_model_loaded()
         
-        # ساخت prompt
+        # ساخت prompt بهتر با context بیشتر
+        # استفاده از فرمت مشابه دیتاست برای سازگاری بیشتر
         prompt = f"User: {message}\nAssistant:"
         
         # Tokenize
@@ -66,11 +67,12 @@ class ChatService:
             max_length=512
         ).to(self.peft_model.device)
         
-        # Generate
+        # Generate با پارامترهای بهبود یافته
         with torch.no_grad():
             outputs = self.peft_model.generate(
                 **inputs,
                 max_new_tokens=max_tokens,
+                min_length=20,  # حداقل طول برای پاسخ‌های کامل
                 temperature=temperature,
                 top_p=top_p,
                 top_k=top_k,
@@ -80,6 +82,7 @@ class ChatService:
                 pad_token_id=self.tokenizer.pad_token_id,
                 eos_token_id=self.tokenizer.eos_token_id,
                 use_cache=True,
+                early_stopping=True,  # توقف زودتر برای پاسخ‌های بهتر
             )
         
         # Decode response

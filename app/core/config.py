@@ -31,12 +31,12 @@ API_RELOAD = os.getenv("API_RELOAD", "false").lower() == "true"
 CORS_ORIGINS = os.getenv("CORS_ORIGINS", "*").split(",")
 
 # تنظیمات Generation
-DEFAULT_MAX_TOKENS = int(os.getenv("DEFAULT_MAX_TOKENS", 300))
-DEFAULT_TEMPERATURE = float(os.getenv("DEFAULT_TEMPERATURE", 0.9))
-DEFAULT_TOP_P = float(os.getenv("DEFAULT_TOP_P", 0.95))
-DEFAULT_TOP_K = int(os.getenv("DEFAULT_TOP_K", 50))
-DEFAULT_REPETITION_PENALTY = float(os.getenv("DEFAULT_REPETITION_PENALTY", 1.4))
-DEFAULT_NO_REPEAT_NGRAM_SIZE = int(os.getenv("DEFAULT_NO_REPEAT_NGRAM_SIZE", 3))
+DEFAULT_MAX_TOKENS = int(os.getenv("DEFAULT_MAX_TOKENS", 200))  # کاهش برای پاسخ‌های متمرکزتر
+DEFAULT_TEMPERATURE = float(os.getenv("DEFAULT_TEMPERATURE", 1.0))  # افزایش برای تنوع بیشتر
+DEFAULT_TOP_P = float(os.getenv("DEFAULT_TOP_P", 0.92))  # کاهش جزئی برای کیفیت بهتر
+DEFAULT_TOP_K = int(os.getenv("DEFAULT_TOP_K", 40))  # کاهش برای انتخاب بهتر
+DEFAULT_REPETITION_PENALTY = float(os.getenv("DEFAULT_REPETITION_PENALTY", 1.5))  # افزایش برای جلوگیری از تکرار
+DEFAULT_NO_REPEAT_NGRAM_SIZE = int(os.getenv("DEFAULT_NO_REPEAT_NGRAM_SIZE", 4))  # افزایش برای جلوگیری از تکرار عبارات
 
 # تنظیمات Quantization
 USE_4BIT = os.getenv("USE_4BIT", "true").lower() == "true"

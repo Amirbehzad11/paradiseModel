@@ -80,16 +80,18 @@ while True:
         with torch.no_grad():
             outputs = peft_model.generate(
                 **inputs,
-                max_new_tokens=300,
-                temperature=0.9,
-                top_p=0.95,
-                top_k=50,
-                repetition_penalty=1.4,
-                no_repeat_ngram_size=3,
+                max_new_tokens=200,  # کاهش برای پاسخ‌های متمرکزتر
+                min_length=20,  # حداقل طول برای پاسخ‌های کامل
+                temperature=1.0,  # افزایش برای تنوع بیشتر
+                top_p=0.92,  # کاهش جزئی برای کیفیت بهتر
+                top_k=40,  # کاهش برای انتخاب بهتر
+                repetition_penalty=1.5,  # افزایش برای جلوگیری از تکرار
+                no_repeat_ngram_size=4,  # افزایش برای جلوگیری از تکرار عبارات
                 do_sample=True,
                 pad_token_id=tokenizer.pad_token_id,
                 eos_token_id=tokenizer.eos_token_id,
                 use_cache=True,
+                early_stopping=True,  # توقف زودتر برای پاسخ‌های بهتر
             )
         
         input_length = inputs["input_ids"].shape[1]
