@@ -1,0 +1,51 @@
+# وابستگی‌های اصلی برای RTX 3080 Fine-tuning
+# Main dependencies for RTX 3080 Fine-tuning
+
+# PyTorch - باید جداگانه نصب شود با CUDA 11.8 یا 12.1
+# PyTorch - should be installed separately with CUDA 11.8 or 12.1
+# برای CUDA 11.8:
+# pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+# برای CUDA 12.1:
+# pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+
+# Hugging Face ecosystem
+transformers>=4.40.0
+accelerate>=0.27.0
+peft>=0.8.0
+bitsandbytes>=0.43.0
+datasets>=2.18.0
+sentencepiece>=0.1.99
+protobuf>=3.20.0
+
+# Training utilities
+scipy>=1.11.0
+scikit-learn>=1.3.0
+
+# Data handling
+numpy>=1.24.0
+pandas>=2.0.0
+
+# Progress bars
+tqdm>=4.66.0
+
+# Hugging Face Hub
+huggingface-hub>=0.20.0
+
+# Tokenization
+tokenizers>=0.15.0
+
+# Optional but recommended
+safetensors>=0.4.0
+
+# Gradio for inference
+gradio>=4.0.0
+
+# Flash Attention (اختیاری - برای سرعت بیشتر)
+# flash-attn>=2.5.0  # نیاز به CUDA و compilation دارد
+
+# API dependencies (اگر می‌خواهید API هم داشته باشید)
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+pydantic>=2.0.0
+requests>=2.31.0
+
