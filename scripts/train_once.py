@@ -1,8 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+"""
+آموزش یکباره مدل
+One-time model training script
+"""
 import os
+import sys
 import json
 import torch
+from pathlib import Path
 from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
@@ -12,19 +18,29 @@ from transformers import (
 )
 from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
 from datasets import Dataset
-import sys
 
-if os.path.exists("./final_model") and os.path.isdir("./final_model"):
-    if os.path.exists("./final_model/config.json"):
-        print("✅ Model already trained. Skipping training.")
-        sys.exit(0)
+# اضافه کردن مسیر روت به sys.path
+BASE_DIR = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(BASE_DIR))
+
+from app.core.config import BASE_MODEL, MODEL_DIR, DATA_DIR
+
+# مسیر dataset
+DATASET_PATH = DATA_DIR / "dataset.json"
+MODEL_OUTPUT_PATH = MODEL_DIR
+
+if MODEL_OUTPUT_PATH.exists() and (MODEL_OUTPUT_PATH / "config.json").exists():
+    print("✅ Model already trained. Skipping training.")
+    sys.exit(0)
 
 print("🚀 Starting model training...")
 
-BASE_MODEL = "HooshvareLab/gpt2-fa"
-
 print("📚 Loading dataset...")
-with open("dataset.json", "r", encoding="utf-8") as f:
+if not DATASET_PATH.exists():
+    print(f"❌ Dataset not found at {DATASET_PATH}")
+    sys.exit(1)
+
+with open(DATASET_PATH, "r", encoding="utf-8") as f:
     dataset = json.load(f)
 
 print(f"✅ {len(dataset)} examples loaded")
@@ -101,7 +117,7 @@ train_dataset = train_dataset.map(tokenize_function, batched=True, remove_column
 eval_dataset = eval_dataset.map(tokenize_function, batched=True, remove_columns=["text"])
 
 training_args = TrainingArguments(
-    output_dir="./checkpoints",
+    output_dir=str(BASE_DIR / "checkpoints"),
     num_train_epochs=3,
     per_device_train_batch_size=4,
     per_device_eval_batch_size=4,
@@ -134,8 +150,10 @@ trainer = Trainer(
 trainer.train()
 
 print("💾 Saving final model...")
-model.save_pretrained("./final_model")
-tokenizer.save_pretrained("./final_model")
+MODEL_OUTPUT_PATH.mkdir(parents=True, exist_ok=True)
+model.save_pretrained(str(MODEL_OUTPUT_PATH))
+tokenizer.save_pretrained(str(MODEL_OUTPUT_PATH))
 
 print("✅ Training completed successfully!")
-print("📁 Model saved to ./final_model")
+print(f"📁 Model saved to {MODEL_OUTPUT_PATH}")
+

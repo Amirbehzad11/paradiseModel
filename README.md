@@ -1,126 +1,218 @@
-# سیستم چت بات فارسی - روح عزیزان فوت‌شده
-# Persian Chatbot System - Deceased Loved Ones' Spirit
+# Chatbot API - API چت بات
 
-سیستم کامل برای آموزش و اجرای یک چت بات فارسی که به عنوان روح عزیزان فوت‌شده صحبت می‌کند.
+یک API کامل و حرفه‌ای برای چت با مدل زبان فارسی با استفاده از FastAPI و PEFT.
 
-Complete system for training and running a Persian chatbot that speaks as the spirit of deceased loved ones.
+## 📁 ساختار پروژه
 
-## 📋 نیازمندی‌ها
-## Requirements
+```
+TTS_MODEL/
+├── app/                    # کد اصلی برنامه
+│   ├── api/                # API endpoints
+│   │   ├── models.py       # Pydantic models
+│   │   └── routes.py       # API routes
+│   ├── core/               # Core functionality
+│   │   ├── config.py       # تنظیمات
+│   │   └── model_loader.py # بارگذاری مدل
+│   ├── services/           # Business logic
+│   │   └── chat_service.py # سرویس چت
+│   └── main.py             # FastAPI app
+├── scripts/                 # اسکریپت‌های کمکی
+│   ├── train_once.py       # آموزش یکباره
+│   ├── train_incremental.py # آموزش تدریجی
+│   ├── continuous_train.py # آموزش پیوسته
+│   └── chat.py             # چت تعاملی
+├── tests/                  # تست‌ها
+│   ├── test_api.py
+│   └── test_model.py
+├── docs/                   # مستندات
+├── data/                   # داده‌ها
+│   └── dataset.json
+├── models/                 # مدل‌های ذخیره شده
+│   └── final_model/
+├── logs/                   # لاگ‌ها
+├── requirements.txt
+└── README.md
+```
 
-- Ubuntu 20.04/22.04
-- NVIDIA GPU با 6GB+ VRAM
-- Python 3.8+
-- CUDA 11.8+
-
-## 🚀 نصب و اجرا
-## Installation and Usage
+## 🚀 نصب و راه‌اندازی
 
 ### 1. نصب وابستگی‌ها
-### 1. Install Dependencies
 
 ```bash
+pip install -r requirements.txt
+```
+
+**نکته:** PyTorch باید جداگانه نصب شود با CUDA:
+
+```bash
+# برای CUDA 11.8
 pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
-pip install transformers accelerate peft bitsandbytes datasets sentencepiece scipy scikit-learn numpy pandas tqdm huggingface-hub tokenizers safetensors
+
+# برای CUDA 12.1
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
 ```
 
-### 2. آموزش مدل (فقط یک بار)
-### 2. Train Model (One Time Only)
+### 2. آماده‌سازی داده‌ها
+
+فایل `data/dataset.json` را با داده‌های خود پر کنید:
+
+```json
+[
+  {
+    "instruction": "سلام خوبی؟",
+    "response": "سلام عزیزم، من اینجام..."
+  }
+]
+```
+
+### 3. آموزش مدل
 
 ```bash
-python train_once.py
+python scripts/train_once.py
 ```
 
-این اسکریپت:
-- بررسی می‌کند آیا مدل از قبل آموزش دیده است
-- اگر `./final_model` وجود داشته باشد، آموزش را رد می‌کند
-- در غیر این صورت، مدل را آموزش می‌دهد (حدود 30-40 دقیقه)
+### 4. اجرای API
 
-### 3. شروع چت
-### 3. Start Chat
-
-**گزینه 1: چت عادی (بدون یادگیری)**
 ```bash
-python chat.py
+python -m app.main
 ```
 
-**گزینه 2: چت با یادگیری خودکار (پیشنهادی)**
+یا:
+
 ```bash
-python chat_with_learning.py
+python -m app.main --host 0.0.0.0 --port 8000
 ```
 
-این نسخه:
-- بعد از هر 10 چت، مدل را خودکار retrain می‌کند
-- از چت‌های شما یاد می‌گیرد و بهتر می‌شود
-- dataset به صورت خودکار بزرگتر می‌شود
+API روی `http://localhost:8000` اجرا می‌شود.
 
-**گزینه 3: یادگیری پیوسته (برای سرور)**
+## 📡 استفاده از API
+
+### مستندات خودکار
+
+- Swagger UI: http://localhost:8000/docs
+- ReDoc: http://localhost:8000/redoc
+
+### Endpoints
+
+#### 1. Health Check
+
 ```bash
-python continuous_train.py
+GET /health
 ```
 
-این نسخه:
-- مدل همیشه در حال train شدن است
-- خودش داده‌های جدید تولید می‌کند
-- هر 5 دقیقه یک چرخه کامل (تولید + train)
-- برای سرورهای 24/7 مناسب است
+#### 2. Chat
 
-- حلقه بی‌نهایت چت
-- برای خروج: `خروج` یا `exit` تایپ کنید
-
-## 📁 ساختار فایل‌ها
-## File Structure
-
-- `train_once.py` - آموزش مدل با QLoRA (فقط یک بار)
-- `chat.py` - چت بات ترمینالی (بدون یادگیری)
-- `chat_with_learning.py` - چت بات با یادگیری خودکار (پیشنهادی)
-- `train_incremental.py` - آموزش تدریجی (فراخوانی خودکار)
-- `continuous_train.py` - یادگیری پیوسته (برای سرور 24/7)
-- `dataset.json` - نمونه‌های آموزشی فارسی
-- `new_chats.json` - چت‌های جدید برای یادگیری
-- `requirements.txt` - وابستگی‌های Python
-- `README.md` - این فایل
-
-## 🔧 جزئیات فنی
-## Technical Details
-
-### مدل پایه
-### Base Model
-- `HooshvareLab/gpt2-fa` - مدل GPT2 فارسی (124M پارامتر)
-
-### روش آموزش
-### Training Method
-- QLoRA با 4-bit quantization
-- LoRA با r=16, alpha=32
-- 3 epochs
-
-### دیتاست
-### Dataset
-- نمونه‌های اولیه: 3000+ نمونه
-- با استفاده از `chat_with_learning.py`، dataset به صورت خودکار بزرگتر می‌شود
-- هر 10 چت جدید = یک retrain خودکار
-
-## ⚠️ نکات مهم
-## Important Notes
-
-1. **اولین اجرا**: نیاز به اینترنت برای دانلود مدل پایه
-2. **پس از آموزش**: کاملاً آفلاین کار می‌کند
-3. **حافظه**: حداقل 6GB VRAM
-4. **زمان آموزش**: حدود 30-40 دقیقه
-
-## 🐛 عیب‌یابی
-## Troubleshooting
-
-### خطای CUDA
 ```bash
-nvidia-smi
+POST /chat
+Content-Type: application/json
+
+{
+  "message": "سلام خوبی؟",
+  "max_tokens": 300,
+  "temperature": 0.9,
+  "top_p": 0.95,
+  "top_k": 50,
+  "repetition_penalty": 1.4,
+  "no_repeat_ngram_size": 3
+}
 ```
 
-### خطای حافظه
-- batch_size را در `train_once.py` کاهش دهید
+#### 3. Chat Simple
 
----
+```bash
+POST /chat/simple?message=سلام
+```
 
-**نکته**: این سیستم فقط فارسی صحبت می‌کند و به عنوان روح عزیزان فوت‌شده پاسخ می‌دهد.
+#### 4. Gradio Compatible
 
-**Note**: This system only speaks Persian and responds as the spirit of deceased loved ones.
+```bash
+POST /api/chat
+Content-Type: application/json
+
+{
+  "data": [["سلام خوبی؟"]]
+}
+```
+
+## 🛠️ اسکریپت‌ها
+
+### آموزش یکباره
+
+```bash
+python scripts/train_once.py
+```
+
+### آموزش تدریجی
+
+```bash
+python scripts/train_incremental.py
+```
+
+### چت تعاملی
+
+```bash
+python scripts/chat.py
+```
+
+## ⚙️ تنظیمات
+
+تنظیمات در `app/core/config.py` قابل تغییر است یا از متغیرهای محیطی:
+
+```bash
+export BASE_MODEL="HooshvareLab/gpt2-fa"
+export API_HOST="0.0.0.0"
+export API_PORT=8000
+export DEFAULT_TEMPERATURE=0.9
+```
+
+## 📚 مستندات
+
+مستندات کامل در فولدر `docs/`:
+
+- `README_API.md` - مستندات API
+- `INTEGRATION_GUIDE.md` - راهنمای یکپارچه‌سازی
+- `HOW_IT_WORKS.md` - نحوه کار سیستم
+- `MODEL_OPTIONS.md` - گزینه‌های مدل
+
+## 🧪 تست
+
+```bash
+python -m pytest tests/
+```
+
+یا:
+
+```bash
+python tests/test_api.py
+```
+
+## 📝 ساختار کد
+
+- **app/api/**: Endpoints و models
+- **app/core/**: تنظیمات و بارگذاری مدل
+- **app/services/**: منطق کسب‌وکار
+- **scripts/**: اسکریپت‌های کمکی
+- **tests/**: تست‌ها
+
+## 🔧 توسعه
+
+برای توسعه:
+
+1. Fork کنید
+2. Branch ایجاد کنید (`git checkout -b feature/AmazingFeature`)
+3. Commit کنید (`git commit -m 'Add some AmazingFeature'`)
+4. Push کنید (`git push origin feature/AmazingFeature`)
+5. Pull Request باز کنید
+
+## 📄 لایسنس
+
+این پروژه برای استفاده آزاد است.
+
+## 🤝 مشارکت
+
+مشارکت‌ها خوش‌آمد هستند! لطفاً ابتدا یک issue باز کنید.
+
+## 📧 تماس
+
+برای سوالات و پیشنهادات، لطفاً issue باز کنید.
+

@@ -67,7 +67,7 @@ if __name__ == "__main__":
         test_health()
     except Exception as e:
         print(f"❌ Error: {e}")
-        print("💡 مطمئن شوید API در حال اجرا است: python api.py")
+        print("💡 مطمئن شوید API در حال اجرا است: python run.py یا python -m app.main")
         exit(1)
     
     # تست chat

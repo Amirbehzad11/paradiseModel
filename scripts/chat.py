@@ -1,19 +1,33 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+"""
+اسکریپت چت تعاملی
+Interactive chat script
+"""
 import os
+import sys
 import torch
+from pathlib import Path
 from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 from peft import PeftModel
-import sys
 import warnings
+
+# اضافه کردن مسیر روت به sys.path
+BASE_DIR = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(BASE_DIR))
+
+from app.core.config import BASE_MODEL, MODEL_DIR
+
 warnings.filterwarnings("ignore")
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
-if not os.path.exists("./final_model"):
-    print("❌ Model not found. Run train_once.py first.")
+MODEL_PATH = MODEL_DIR
+
+if not MODEL_PATH.exists():
+    print(f"❌ Model not found at {MODEL_PATH}. Run scripts/train_once.py first.")
     sys.exit(1)
 
-print("Loading model...")
+print("🔄 Loading model...")
 
 bnb_config = BitsAndBytesConfig(
     load_in_4bit=True,
@@ -21,8 +35,6 @@ bnb_config = BitsAndBytesConfig(
     bnb_4bit_compute_dtype=torch.float16,
     bnb_4bit_use_double_quant=True,
 )
-
-BASE_MODEL = "HooshvareLab/gpt2-fa"
 
 os.environ["HF_HUB_DOWNLOAD_TIMEOUT"] = "300"
 
@@ -34,14 +46,14 @@ base_model = AutoModelForCausalLM.from_pretrained(
     local_files_only=False,
 )
 
-peft_model = PeftModel.from_pretrained(base_model, "./final_model")
-tokenizer = AutoTokenizer.from_pretrained("./final_model", trust_remote_code=True)
+peft_model = PeftModel.from_pretrained(base_model, str(MODEL_PATH))
+tokenizer = AutoTokenizer.from_pretrained(str(MODEL_PATH), trust_remote_code=True)
 
 if tokenizer.pad_token is None:
     tokenizer.pad_token = tokenizer.eos_token
     tokenizer.pad_token_id = tokenizer.eos_token_id
 
-print("Ready. Type 'خروج' or 'exit' to quit.\n")
+print("✅ Ready. Type 'خروج' or 'exit' to quit.\n")
 
 while True:
     try:
@@ -69,11 +81,11 @@ while True:
             outputs = peft_model.generate(
                 **inputs,
                 max_new_tokens=300,
-                temperature=0.9,  # افزایش برای تنوع بیشتر (0.7 -> 0.9)
-                top_p=0.95,  # افزایش برای انتخاب کلمات بهتر (0.9 -> 0.95)
-                top_k=50,  # محدود کردن به 50 کلمه برتر برای تنوع بیشتر
-                repetition_penalty=1.4,  # افزایش برای جلوگیری از تکرار (1.2 -> 1.4)
-                no_repeat_ngram_size=3,  # جلوگیری از تکرار عبارات 3 کلمه‌ای
+                temperature=0.9,
+                top_p=0.95,
+                top_k=50,
+                repetition_penalty=1.4,
+                no_repeat_ngram_size=3,
                 do_sample=True,
                 pad_token_id=tokenizer.pad_token_id,
                 eos_token_id=tokenizer.eos_token_id,
@@ -94,3 +106,4 @@ while True:
     except Exception as e:
         print(f"\n❌ خطا: {e}\n")
         continue
+
