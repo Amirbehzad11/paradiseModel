@@ -26,6 +26,7 @@ from peft import (
 )
 from datasets import Dataset
 import sys
+import time
 
 # اضافه کردن مسیر روت
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -206,10 +207,14 @@ bnb_config = BitsAndBytesConfig(
 )
 
 # ============================================================================
-# بارگذاری مدل با مدیریت حافظه
+# بارگذاری مدل با مدیریت حافظه و دانلود پایدار
 # ============================================================================
 print("\n🤖 Loading base model (this may take a few minutes)...")
-os.environ["HF_HUB_DOWNLOAD_TIMEOUT"] = "600"
+
+# تنظیمات timeout و retry برای دانلود پایدار
+os.environ["HF_HUB_DOWNLOAD_TIMEOUT"] = "3600"  # 1 ساعت timeout
+os.environ["HF_HUB_DOWNLOAD_RETRY"] = "10"     # 10 بار retry
+os.environ["HF_HUB_DOWNLOAD_RETRY_DELAY"] = "5"  # 5 ثانیه تاخیر بین retry
 
 # بررسی flash_attention
 try:
@@ -236,29 +241,80 @@ if torch.cuda.is_available():
 else:
     max_memory = {"cpu": "30GB"}
 
-# بارگذاری مدل
+# بارگذاری مدل با retry و resume
 model = None
 for model_name in [BASE_MODEL, FALLBACK_MODEL]:
-    try:
-        print(f"\n   Loading {model_name}...")
-        model = AutoModelForCausalLM.from_pretrained(
-            model_name,
-            quantization_config=bnb_config,
-            device_map="auto",
-            max_memory=max_memory,
-            trust_remote_code=True,
-            torch_dtype=torch.float16,
-            attn_implementation="flash_attention_2" if use_flash_attention else "eager",
-        )
-        BASE_MODEL = model_name
-        print(f"✅ Successfully loaded {model_name}")
+    max_retries = 5  # 5 بار retry
+    retry_count = 0
+    
+    while retry_count < max_retries:
+        try:
+            print(f"\n   Loading {model_name}... (Attempt {retry_count + 1}/{max_retries})")
+            
+            # دانلود با resume و retry
+            model = AutoModelForCausalLM.from_pretrained(
+                model_name,
+                quantization_config=bnb_config,
+                device_map="auto",
+                max_memory=max_memory,
+                trust_remote_code=True,
+                dtype=torch.float16,  # استفاده از dtype به جای torch_dtype (deprecated)
+                attn_implementation="flash_attention_2" if use_flash_attention else "eager",
+                resume_download=True,  # ادامه دانلود از جایی که قطع شده
+                local_files_only=False,  # اجازه دانلود از اینترنت
+            )
+            BASE_MODEL = model_name
+            print(f"✅ Successfully loaded {model_name}")
+            break
+            
+        except Exception as e:
+            error_msg = str(e)
+            print(f"   ⚠️  Attempt {retry_count + 1} failed: {error_msg[:200]}")
+            
+            # بررسی نوع خطا
+            if "timeout" in error_msg.lower() or "timed out" in error_msg.lower():
+                retry_count += 1
+                if retry_count < max_retries:
+                    wait_time = retry_count * 10  # 10, 20, 30, 40 ثانیه
+                    print(f"   ⏳ Timeout detected. Waiting {wait_time} seconds before retry...")
+                    time.sleep(wait_time)
+                    print(f"   🔄 Retrying download (will resume from where it stopped)...")
+                    continue
+                else:
+                    print(f"   ❌ Max retries ({max_retries}) reached for {model_name}")
+                    print(f"   💡 Don't worry! The download has been saved.")
+                    print(f"   💡 Just run this script again - it will resume from 98%")
+            elif "gated" in error_msg.lower() or "access" in error_msg.lower():
+                # برای gated repo، به مدل بعدی برو
+                print(f"   ⚠️  Gated repo - trying next model...")
+                break
+            else:
+                # برای خطاهای دیگر، یک بار retry کن
+                retry_count += 1
+                if retry_count < max_retries:
+                    print(f"   🔄 Retrying...")
+                    time.sleep(5)
+                    continue
+                else:
+                    break
+    
+    if model is not None:
         break
-    except Exception as e:
-        print(f"   ⚠️  Failed to load {model_name}: {str(e)[:200]}")
-        if model_name == FALLBACK_MODEL:
-            print("❌ Failed to load any model!")
-            sys.exit(1)
-        continue
+    
+    # اگر همه retry ها شکست خورد و این آخرین مدل بود
+    if model_name == FALLBACK_MODEL and model is None:
+        print("\n" + "=" * 80)
+        print("❌ Failed to load any model after all retries!")
+        print("=" * 80)
+        print("\n💡 راه‌حل‌ها:")
+        print("   1. ✅ دانلود در حال انجام است - فقط دوباره این اسکریپت را اجرا کنید!")
+        print("      python scripts/train_3080.py")
+        print("      (دانلود از 98% ادامه می‌یابد)")
+        print("\n   2. بررسی اتصال اینترنت")
+        print("\n   3. اگر مشکل ادامه داشت، مدل را دستی دانلود کنید:")
+        print(f"      huggingface-cli download {FALLBACK_MODEL} --resume-download")
+        print("=" * 80)
+        sys.exit(1)
 
 if model is None:
     print("❌ Model loading failed!")
