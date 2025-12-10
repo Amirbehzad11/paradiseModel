@@ -69,9 +69,11 @@ while True:
             outputs = peft_model.generate(
                 **inputs,
                 max_new_tokens=300,
-                temperature=0.7,
-                top_p=0.9,
-                repetition_penalty=1.2,
+                temperature=0.9,  # افزایش برای تنوع بیشتر (0.7 -> 0.9)
+                top_p=0.95,  # افزایش برای انتخاب کلمات بهتر (0.9 -> 0.95)
+                top_k=50,  # محدود کردن به 50 کلمه برتر برای تنوع بیشتر
+                repetition_penalty=1.4,  # افزایش برای جلوگیری از تکرار (1.2 -> 1.4)
+                no_repeat_ngram_size=3,  # جلوگیری از تکرار عبارات 3 کلمه‌ای
                 do_sample=True,
                 pad_token_id=tokenizer.pad_token_id,
                 eos_token_id=tokenizer.eos_token_id,

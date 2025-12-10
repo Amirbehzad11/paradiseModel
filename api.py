@@ -43,9 +43,11 @@ BASE_MODEL = "HooshvareLab/gpt2-fa"
 class ChatRequest(BaseModel):
     message: str
     max_tokens: int = 300
-    temperature: float = 0.7
-    top_p: float = 0.9
-    repetition_penalty: float = 1.2
+    temperature: float = 0.9  # افزایش برای تنوع بیشتر
+    top_p: float = 0.95  # افزایش برای انتخاب کلمات بهتر
+    top_k: int = 50  # محدود کردن به 50 کلمه برتر
+    repetition_penalty: float = 1.4  # افزایش برای جلوگیری از تکرار
+    no_repeat_ngram_size: int = 3  # جلوگیری از تکرار عبارات
 
 class ChatResponse(BaseModel):
     response: str
@@ -150,7 +152,9 @@ async def chat(request: ChatRequest):
                 max_new_tokens=request.max_tokens,
                 temperature=request.temperature,
                 top_p=request.top_p,
+                top_k=request.top_k,
                 repetition_penalty=request.repetition_penalty,
+                no_repeat_ngram_size=request.no_repeat_ngram_size,
                 do_sample=True,
                 pad_token_id=tokenizer.pad_token_id,
                 eos_token_id=tokenizer.eos_token_id,
