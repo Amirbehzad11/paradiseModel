@@ -3,7 +3,8 @@
 """
 API routes
 """
-from fastapi import APIRouter, HTTPException, Request
+import json
+from fastapi import APIRouter, HTTPException, Request, WebSocket, WebSocketDisconnect
 from app.api.models import ChatRequest, ChatResponse, HealthResponse
 from app.services.chat_service import ChatService
 from app.core.model_loader import is_model_loaded
@@ -121,4 +122,85 @@ async def chat_gradio(request: Request):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error generating response: {str(e)}")
+
+
+@router.websocket("/ws/chat")
+async def websocket_chat(websocket: WebSocket):
+    """
+    WebSocket endpoint برای چت سریع و real-time
+    """
+    await websocket.accept()
+    
+    if not is_model_loaded():
+        await websocket.send_json({
+            "error": "Model not loaded",
+            "status": "error"
+        })
+        await websocket.close()
+        return
+    
+    try:
+        while True:
+            # دریافت پیام از client
+            data = await websocket.receive_text()
+            
+            try:
+                message_data = json.loads(data)
+                message = message_data.get("message", "")
+                
+                if not message or not message.strip():
+                    await websocket.send_json({
+                        "error": "Message cannot be empty",
+                        "status": "error"
+                    })
+                    continue
+                
+                # پارامترهای اختیاری
+                max_tokens = message_data.get("max_tokens", 200)
+                temperature = message_data.get("temperature", 1.0)
+                top_p = message_data.get("top_p", 0.92)
+                top_k = message_data.get("top_k", 40)
+                repetition_penalty = message_data.get("repetition_penalty", 1.5)
+                no_repeat_ngram_size = message_data.get("no_repeat_ngram_size", 4)
+                
+                # تولید پاسخ
+                response = await chat_service.generate_response(
+                    message=message,
+                    max_tokens=max_tokens,
+                    temperature=temperature,
+                    top_p=top_p,
+                    top_k=top_k,
+                    repetition_penalty=repetition_penalty,
+                    no_repeat_ngram_size=no_repeat_ngram_size,
+                )
+                
+                # ارسال پاسخ
+                await websocket.send_json({
+                    "response": response,
+                    "status": "success"
+                })
+                
+            except json.JSONDecodeError:
+                await websocket.send_json({
+                    "error": "Invalid JSON format",
+                    "status": "error"
+                })
+            except Exception as e:
+                await websocket.send_json({
+                    "error": f"Error generating response: {str(e)}",
+                    "status": "error"
+                })
+                
+    except WebSocketDisconnect:
+        # Client disconnected normally
+        pass
+    except Exception as e:
+        try:
+            await websocket.send_json({
+                "error": f"Connection error: {str(e)}",
+                "status": "error"
+            })
+            await websocket.close()
+        except:
+            pass
 

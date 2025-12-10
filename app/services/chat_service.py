@@ -5,6 +5,9 @@
 Chat Service - Main response generation logic
 """
 import torch
+import json
+from pathlib import Path
+from datetime import datetime
 from app.core.model_loader import get_model
 from app.core.config import (
     DEFAULT_MAX_TOKENS,
@@ -12,8 +15,11 @@ from app.core.config import (
     DEFAULT_TOP_P,
     DEFAULT_TOP_K,
     DEFAULT_REPETITION_PENALTY,
-    DEFAULT_NO_REPEAT_NGRAM_SIZE
+    DEFAULT_NO_REPEAT_NGRAM_SIZE,
+    DATA_DIR
 )
+
+CHAT_LOG_PATH = DATA_DIR / "chat_logs.json"
 
 
 class ChatService:
@@ -27,6 +33,32 @@ class ChatService:
         """اطمینان از بارگذاری مدل"""
         if self.peft_model is None or self.tokenizer is None:
             self.peft_model, self.tokenizer = get_model()
+    
+    def _log_chat(self, message: str, response: str):
+        """ذخیره چت در لاگ برای یادگیری"""
+        try:
+            log_path = CHAT_LOG_PATH
+            logs = []
+            
+            if log_path.exists():
+                with open(log_path, "r", encoding="utf-8") as f:
+                    logs = json.load(f)
+            
+            logs.append({
+                "instruction": message,
+                "response": response,
+                "timestamp": datetime.now().isoformat()
+            })
+            
+            # محدود کردن اندازه لاگ
+            if len(logs) > 1000:
+                logs = logs[-1000:]
+            
+            with open(log_path, "w", encoding="utf-8") as f:
+                json.dump(logs, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            # اگر لاگ کردن با خطا مواجه شد، ادامه بده
+            pass
     
     async def generate_response(
         self,
@@ -96,5 +128,7 @@ class ChatService:
         if response.startswith(prompt):
             response = response[len(prompt):].strip()
         
+        # لاگ کردن چت برای یادگیری
+        self._log_chat(message, response)
+        
         return response
-
