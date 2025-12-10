@@ -18,8 +18,10 @@ sys.path.insert(0, str(BASE_DIR))
 
 from app.core.config import MODEL_DIR
 
-BASE_MODEL = "meta-llama/Meta-Llama-3.1-8B-Instruct"
-MODEL_PATH = MODEL_DIR / "llama3_8b_finetuned"
+# استفاده از مدل باز بدون نیاز به احراز هویت Hugging Face
+# Using open model without Hugging Face authentication requirement
+BASE_MODEL = "microsoft/Phi-3-mini-4k-instruct"  # کاملاً باز، بدون نیاز به مجوز
+MODEL_PATH = MODEL_DIR / "phi3_mini_finetuned"
 
 # Global variables
 model = None

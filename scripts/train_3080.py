@@ -33,9 +33,11 @@ sys.path.insert(0, str(BASE_DIR))
 from app.core.config import DATA_DIR, MODEL_DIR
 
 # تنظیمات
-BASE_MODEL = "meta-llama/Meta-Llama-3.1-8B-Instruct"
+# استفاده از مدل باز بدون نیاز به احراز هویت Hugging Face
+# Using open model without Hugging Face authentication requirement
+BASE_MODEL = "microsoft/Phi-3-mini-4k-instruct"  # کاملاً باز، بدون نیاز به مجوز
 DATASET_PATH = DATA_DIR / "data_persian.json"
-OUTPUT_DIR = MODEL_DIR / "llama3_8b_finetuned"
+OUTPUT_DIR = MODEL_DIR / "phi3_mini_finetuned"
 CHECKPOINT_DIR = BASE_DIR / "checkpoints_3080"
 
 # تنظیمات QLoRA برای RTX 3080
@@ -52,6 +54,7 @@ print("=" * 80)
 print("Fine-tuning for RTX 3080 10GB")
 print("=" * 80)
 print(f"Base Model: {BASE_MODEL}")
+print(f"✅ Using open model - No authentication required!")
 print(f"Dataset: {DATASET_PATH}")
 print(f"Output: {OUTPUT_DIR}")
 print("=" * 80)
@@ -69,13 +72,13 @@ with open(DATASET_PATH, "r", encoding="utf-8") as f:
 
 print(f"✅ Loaded {len(raw_data)} examples")
 
-# تبدیل به فرمت مناسب
-def format_chatml(examples):
-    """تبدیل به فرمت ChatML"""
+# تبدیل به فرمت مناسب برای Phi-3
+def format_phi3(examples):
+    """تبدیل به فرمت Phi-3"""
     formatted = []
     for item in examples:
         if "messages" in item:
-            # فرمت ChatML
+            # فرمت ChatML برای Phi-3
             messages = item["messages"]
             text = ""
             for msg in messages:
@@ -87,7 +90,7 @@ def format_chatml(examples):
                     text += f"<|assistant|>\n{content}<|end|>\n"
             formatted.append({"text": text})
         elif "instruction" in item:
-            # فرمت Alpaca
+            # فرمت Alpaca برای Phi-3
             instruction = item.get("instruction", "")
             response = item.get("response", "")
             text = f"<|user|>\n{instruction}<|end|>\n<|assistant|>\n{response}<|end|>\n"
@@ -95,7 +98,7 @@ def format_chatml(examples):
     return formatted
 
 print("\n🔄 Formatting dataset...")
-formatted_data = format_chatml(raw_data)
+formatted_data = format_phi3(raw_data)
 dataset = Dataset.from_list(formatted_data)
 
 # تقسیم train/eval
