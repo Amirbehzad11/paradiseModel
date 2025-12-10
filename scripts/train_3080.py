@@ -325,6 +325,14 @@ print("\n🔧 Preparing model for training...")
 model = prepare_model_for_kbit_training(model)
 
 # ============================================================================
+# Resize token embeddings (قبل از اعمال LoRA)
+# ============================================================================
+if num_added > 0:
+    print(f"\n🔧 Resizing token embeddings from {len(tokenizer) - num_added} to {len(tokenizer)}...")
+    model.resize_token_embeddings(len(tokenizer))
+    print("✅ Token embeddings resized")
+
+# ============================================================================
 # تنظیم QLoRA با target_modules بهینه
 # ============================================================================
 print("\n🔧 Setting up QLoRA...")
@@ -360,14 +368,10 @@ lora_config = LoraConfig(
     lora_dropout=LORA_DROPOUT,
     bias="none",
     task_type=TaskType.CAUSAL_LM,
-    modules_to_save=["embed_tokens", "lm_head"],
+    # modules_to_save را حذف کردیم چون قبلاً resize کردیم
 )
 
 model = get_peft_model(model, lora_config)
-
-# Resize token embeddings
-if num_added > 0:
-    model.resize_token_embeddings(len(tokenizer))
 
 # نمایش پارامترهای trainable
 print("\n📊 Trainable Parameters:")
