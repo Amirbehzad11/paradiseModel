@@ -47,14 +47,24 @@ def load_model():
         bnb_4bit_use_double_quant=True,
     )
     
+    # بررسی نصب flash_attention
+    try:
+        import flash_attn
+        use_flash_attention = torch.cuda.is_available()
+        if use_flash_attention:
+            print("✅ Flash Attention 2 detected")
+    except ImportError:
+        use_flash_attention = False
+        print("ℹ️  Flash Attention 2 not installed, using eager attention")
+    
     # بارگذاری base model
     base_model = AutoModelForCausalLM.from_pretrained(
         BASE_MODEL,
         quantization_config=bnb_config,
         device_map="auto",
         trust_remote_code=True,
-        torch_dtype=torch.bfloat16,
-        attn_implementation="flash_attention_2" if torch.cuda.is_available() else "eager",
+        dtype=torch.bfloat16,  # استفاده از dtype به جای torch_dtype (deprecated)
+        attn_implementation="flash_attention_2" if use_flash_attention else "eager",
     )
     
     # بارگذاری LoRA adapter
