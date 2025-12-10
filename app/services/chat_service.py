@@ -35,14 +35,27 @@ class ChatService:
             self.peft_model, self.tokenizer = get_model()
     
     def _log_chat(self, message: str, response: str):
-        """ذخیره چت در لاگ برای یادگیری"""
+        """ذخیره چت در لاگ برای یادگیری (در background thread برای سرعت)"""
+        # اجرای لاگ در background thread تا سرعت را کاهش ندهد
+        try:
+            import threading
+            threading.Thread(target=self._write_log, args=(message, response), daemon=True).start()
+        except Exception:
+            # اگر thread ایجاد نشد، لاگ نکن (سرعت مهم‌تر است)
+            pass
+    
+    def _write_log(self, message: str, response: str):
+        """نوشتن لاگ به صورت sync در background"""
         try:
             log_path = CHAT_LOG_PATH
             logs = []
             
             if log_path.exists():
-                with open(log_path, "r", encoding="utf-8") as f:
-                    logs = json.load(f)
+                try:
+                    with open(log_path, "r", encoding="utf-8") as f:
+                        logs = json.load(f)
+                except:
+                    logs = []
             
             logs.append({
                 "instruction": message,
@@ -54,10 +67,10 @@ class ChatService:
             if len(logs) > 1000:
                 logs = logs[-1000:]
             
+            # نوشتن بدون indent برای سرعت بیشتر
             with open(log_path, "w", encoding="utf-8") as f:
-                json.dump(logs, f, ensure_ascii=False, indent=2)
-        except Exception as e:
-            # اگر لاگ کردن با خطا مواجه شد، ادامه بده
+                json.dump(logs, f, ensure_ascii=False)
+        except:
             pass
     
     async def generate_response(
@@ -91,30 +104,31 @@ class ChatService:
         # استفاده از فرمت مشابه دیتاست برای سازگاری بیشتر
         prompt = f"User: {message}\nAssistant:"
         
-        # Tokenize
+        # Tokenize (کاهش max_length برای سرعت بیشتر)
         inputs = self.tokenizer(
             prompt,
             return_tensors="pt",
             truncation=True,
-            max_length=512
+            max_length=256  # کاهش از 512 به 256 برای سرعت بیشتر
         ).to(self.peft_model.device)
         
-        # Generate با پارامترهای بهبود یافته
+        # Generate با پارامترهای بهینه شده برای سرعت
         with torch.no_grad():
             outputs = self.peft_model.generate(
                 **inputs,
                 max_new_tokens=max_tokens,
-                min_length=20,  # حداقل طول برای پاسخ‌های کامل
+                min_length=5,  # کاهش برای سرعت بیشتر
                 temperature=temperature,
                 top_p=top_p,
                 top_k=top_k,
                 repetition_penalty=repetition_penalty,
                 no_repeat_ngram_size=no_repeat_ngram_size,
-                do_sample=True,
+                do_sample=temperature > 0.1,  # فقط اگر temperature بالا باشد sampling کن
                 pad_token_id=self.tokenizer.pad_token_id,
                 eos_token_id=self.tokenizer.eos_token_id,
                 use_cache=True,
-                early_stopping=True,  # توقف زودتر برای پاسخ‌های بهتر
+                early_stopping=True,
+                num_beams=1 if temperature > 0.1 else 1,  # بدون beam search برای سرعت
             )
         
         # Decode response

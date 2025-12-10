@@ -31,7 +31,7 @@ API_RELOAD = os.getenv("API_RELOAD", "false").lower() == "true"
 CORS_ORIGINS = os.getenv("CORS_ORIGINS", "*").split(",")
 
 # تنظیمات Generation
-DEFAULT_MAX_TOKENS = int(os.getenv("DEFAULT_MAX_TOKENS", 200))  # کاهش برای پاسخ‌های متمرکزتر
+DEFAULT_MAX_TOKENS = int(os.getenv("DEFAULT_MAX_TOKENS", 100))  # کاهش برای سرعت بیشتر
 DEFAULT_TEMPERATURE = float(os.getenv("DEFAULT_TEMPERATURE", 1.0))  # افزایش برای تنوع بیشتر
 DEFAULT_TOP_P = float(os.getenv("DEFAULT_TOP_P", 0.92))  # کاهش جزئی برای کیفیت بهتر
 DEFAULT_TOP_K = int(os.getenv("DEFAULT_TOP_K", 40))  # کاهش برای انتخاب بهتر
