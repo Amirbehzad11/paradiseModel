@@ -154,10 +154,16 @@ if not model_loaded:
     print("❌ Failed to load any model!")
     sys.exit(1)
 
-# تنظیم pad_token
+# تنظیم pad_token (مهم برای data collator)
 if tokenizer.pad_token is None:
     tokenizer.pad_token = tokenizer.eos_token
     tokenizer.pad_token_id = tokenizer.eos_token_id
+
+# اطمینان از اینکه pad_token_id تنظیم شده است
+if tokenizer.pad_token_id is None:
+    tokenizer.pad_token_id = tokenizer.eos_token_id
+
+print(f"✅ Pad token ID: {tokenizer.pad_token_id}")
 
 # اضافه کردن special tokens
 special_tokens = {
@@ -172,13 +178,17 @@ if num_added > 0:
 # ============================================================================
 print("\n🔤 Tokenizing dataset...")
 def tokenize_function(examples):
+    # Tokenization بدون padding (padding در data collator انجام می‌شود)
     tokenized = tokenizer(
         examples["text"],
         truncation=True,
         max_length=MAX_SEQ_LENGTH,
-        padding=False,
+        padding=False,  # padding در data collator انجام می‌شود
+        return_overflowing_tokens=False,
     )
-    tokenized["labels"] = tokenized["input_ids"].copy()
+    # برای causal LM، labels همان input_ids است
+    # کپی کردن برای اطمینان از اینکه تغییر نمی‌کند
+    tokenized["labels"] = tokenized["input_ids"]
     return tokenized
 
 train_dataset = train_dataset.map(
@@ -409,11 +419,19 @@ training_args = TrainingArguments(
     dataloader_num_workers=0,  # جلوگیری از مشکل multiprocessing
 )
 
-# Data collator
+# Data collator با padding مناسب
+# استفاده از DataCollatorForLanguageModeling با تنظیمات بهینه
+print("\n🔧 Setting up data collator...")
 data_collator = DataCollatorForLanguageModeling(
     tokenizer=tokenizer,
-    mlm=False,
+    mlm=False,  # برای causal LM
+    pad_to_multiple_of=8,  # برای کارایی بهتر با tensor cores
 )
+
+# تست data collator
+print("✅ Data collator ready")
+print(f"   Pad token ID: {tokenizer.pad_token_id}")
+print(f"   EOS token ID: {tokenizer.eos_token_id}")
 
 # ============================================================================
 # Trainer
