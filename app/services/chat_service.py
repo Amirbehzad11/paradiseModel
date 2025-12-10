@@ -8,6 +8,7 @@ import torch
 import json
 from pathlib import Path
 from datetime import datetime
+from typing import Optional
 from app.core.model_loader import get_model
 from app.core.config import (
     DEFAULT_MAX_TOKENS,
@@ -18,6 +19,7 @@ from app.core.config import (
     DEFAULT_NO_REPEAT_NGRAM_SIZE,
     DATA_DIR
 )
+from app.services.memory_service import MemoryService
 
 CHAT_LOG_PATH = DATA_DIR / "chat_logs.json"
 
@@ -28,6 +30,7 @@ class ChatService:
     def __init__(self):
         self.peft_model = None
         self.tokenizer = None
+        self.memory = MemoryService()
     
     def _ensure_model_loaded(self):
         """اطمینان از بارگذاری مدل"""
@@ -76,6 +79,7 @@ class ChatService:
     async def generate_response(
         self,
         message: str,
+        session_id: Optional[str] = None,
         max_tokens: int = DEFAULT_MAX_TOKENS,
         temperature: float = DEFAULT_TEMPERATURE,
         top_p: float = DEFAULT_TOP_P,
@@ -88,6 +92,7 @@ class ChatService:
         
         Args:
             message: پیام کاربر
+            session_id: شناسه session برای حفظ context
             max_tokens: حداکثر تعداد token
             temperature: کنترل خلاقیت
             top_p: Nucleus sampling
@@ -100,9 +105,12 @@ class ChatService:
         """
         self._ensure_model_loaded()
         
-        # ساخت prompt بهتر با context بیشتر
-        # استفاده از فرمت مشابه دیتاست برای سازگاری بیشتر
-        prompt = f"User: {message}\nAssistant:"
+        # استفاده از حافظه برای ساخت prompt با context
+        if session_id:
+            prompt = self.memory.get_context_prompt(session_id, message)
+        else:
+            # اگر session_id نداشتیم، از prompt ساده استفاده کنیم
+            prompt = f"User: {message}\nAssistant:"
         
         # Tokenize (کاهش max_length برای سرعت بیشتر)
         inputs = self.tokenizer(
@@ -141,6 +149,10 @@ class ChatService:
         # حذف prompt اگر در response باشد
         if response.startswith(prompt):
             response = response[len(prompt):].strip()
+        
+        # ذخیره در حافظه اگر session_id داشتیم
+        if session_id:
+            self.memory.add_context(session_id, message, response)
         
         # لاگ کردن چت برای یادگیری
         self._log_chat(message, response)

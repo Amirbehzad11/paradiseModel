@@ -4,7 +4,7 @@
 API routes
 """
 import json
-from fastapi import APIRouter, HTTPException, Request, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, HTTPException, Request, WebSocket, WebSocketDisconnect, Request as FastAPIRequest
 from app.api.models import ChatRequest, ChatResponse, HealthResponse
 from app.services.chat_service import ChatService
 from app.core.model_loader import is_model_loaded
@@ -32,12 +32,13 @@ async def health():
 
 
 @router.post("/chat", response_model=ChatResponse)
-async def chat(request: ChatRequest):
+async def chat(request: ChatRequest, http_request: FastAPIRequest = None):
     """
     چت با مدل
     
     Args:
         request: درخواست چت شامل message و پارامترهای generation
+        http_request: Request object برای دریافت session_id
     
     Returns:
         پاسخ مدل
@@ -49,8 +50,14 @@ async def chat(request: ChatRequest):
         raise HTTPException(status_code=400, detail="Message cannot be empty")
     
     try:
+        # دریافت session_id از request یا header
+        session_id = request.session_id
+        if not session_id and http_request:
+            session_id = http_request.headers.get("X-Session-ID") or http_request.query_params.get("session_id")
+        
         response = await chat_service.generate_response(
             message=request.message,
+            session_id=session_id,
             max_tokens=request.max_tokens,
             temperature=request.temperature,
             top_p=request.top_p,
@@ -66,17 +73,18 @@ async def chat(request: ChatRequest):
 
 
 @router.post("/chat/simple")
-async def chat_simple(message: str):
+async def chat_simple(message: str, session_id: str = None):
     """
     چت ساده (فقط message)
     
     Args:
         message: متن کاربر
+        session_id: شناسه session (اختیاری)
     
     Returns:
         پاسخ مدل
     """
-    request = ChatRequest(message=message)
+    request = ChatRequest(message=message, session_id=session_id)
     return await chat(request)
 
 
@@ -112,8 +120,14 @@ async def chat_gradio(request: Request):
         if not message or not str(message).strip():
             raise HTTPException(status_code=400, detail="Message not found in request")
         
+        # دریافت session_id از body
+        session_id = body.get("session_id") or body.get("sessionId")
+        
         # استفاده از chat service
-        response = await chat_service.generate_response(message=message)
+        response = await chat_service.generate_response(
+            message=message,
+            session_id=session_id
+        )
         
         # برگرداندن پاسخ به فرمت Gradio: [["response"]]
         return [[response]]
@@ -156,6 +170,7 @@ async def websocket_chat(websocket: WebSocket):
                     continue
                 
                 # پارامترهای اختیاری
+                session_id = message_data.get("session_id") or message_data.get("sessionId")
                 max_tokens = message_data.get("max_tokens", 200)
                 temperature = message_data.get("temperature", 1.0)
                 top_p = message_data.get("top_p", 0.92)
@@ -166,6 +181,7 @@ async def websocket_chat(websocket: WebSocket):
                 # تولید پاسخ
                 response = await chat_service.generate_response(
                     message=message,
+                    session_id=session_id,
                     max_tokens=max_tokens,
                     temperature=temperature,
                     top_p=top_p,
@@ -203,4 +219,46 @@ async def websocket_chat(websocket: WebSocket):
             await websocket.close()
         except:
             pass
+
+
+@router.delete("/session/{session_id}")
+async def clear_session(session_id: str):
+    """
+    پاک کردن session
+    
+    Args:
+        session_id: شناسه session
+    
+    Returns:
+        وضعیت حذف
+    """
+    try:
+        chat_service.memory.clear_session(session_id)
+        return {"status": "success", "message": f"Session {session_id} cleared"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error clearing session: {str(e)}")
+
+
+@router.get("/session/{session_id}")
+async def get_session_info(session_id: str):
+    """
+    دریافت اطلاعات session
+    
+    Args:
+        session_id: شناسه session
+    
+    Returns:
+        اطلاعات session
+    """
+    try:
+        session = chat_service.memory.get_or_create_session(session_id)
+        return {
+            "session_id": session_id,
+            "role": session.get("role"),
+            "context_count": len(session.get("context", [])),
+            "created_at": session.get("created_at"),
+            "last_access": session.get("last_access")
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error getting session: {str(e)}")
 
