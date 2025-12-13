@@ -38,8 +38,11 @@ DEFAULT_TOP_K = int(os.getenv("DEFAULT_TOP_K", 40))  # کاهش برای انت�
 DEFAULT_REPETITION_PENALTY = float(os.getenv("DEFAULT_REPETITION_PENALTY", 1.5))  # افزایش برای جلوگیری از تکرار
 DEFAULT_NO_REPEAT_NGRAM_SIZE = int(os.getenv("DEFAULT_NO_REPEAT_NGRAM_SIZE", 4))  # افزایش برای جلوگیری از تکرار عبارات
 
-# تنظیمات Quantization
-USE_4BIT = os.getenv("USE_4BIT", "true").lower() == "true"
+# تنظیمات Device (GPU یا CPU)
+USE_CPU = os.getenv("USE_CPU", "false").lower() == "true"  # استفاده از CPU به جای GPU
+
+# تنظیمات Quantization (فقط برای GPU)
+USE_4BIT = os.getenv("USE_4BIT", "true").lower() == "true" and not USE_CPU
 BNB_4BIT_QUANT_TYPE = os.getenv("BNB_4BIT_QUANT_TYPE", "nf4")
 BNB_4BIT_COMPUTE_DTYPE = os.getenv("BNB_4BIT_COMPUTE_DTYPE", "float16")
 
